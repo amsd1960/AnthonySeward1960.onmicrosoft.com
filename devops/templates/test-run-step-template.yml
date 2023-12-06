@@ -1,0 +1,117 @@
+# Template to run a single set of tests
+# - Specifies Python version
+# - Installs requirements
+# - Saves pip and conda environments to Artifact
+# - Installs interpret-text via specified means
+# - Runs specified test suite
+# - Runs flake8
+# - Saves test results
+
+parameters:
+- name: testRunType
+  type: string
+  values:
+  - Unit
+  - Notebooks
+  - CodeCoverage
+- name: installationType
+  type: string
+- name: pythonVersion
+  type: string
+- name: pinRequirements
+  type: boolean
+  default: False
+- name: envInfoArtifact
+  type: string
+- name: envInfoFileBase
+  type: string
+# Following are used if the installationType is PyPI
+- name: pypiUrl
+  type: string
+- name: versionArtifactName
+  type: string
+- name: versionArtifactFile
+  type: string
+# Following used if the installationType is WheelArtifact
+- name: wheelArtifactName
+  type: string
+- name: condaEnv
+  type: string
+  default: interp_community
+
+steps:
+- template: conda-path-step-template.yml
+
+- template: create-env-step-template.yml
+  parameters:
+    pythonVersion: ${{parameters.pythonVersion}}
+    condaEnv: ${{parameters.condaEnv}}
+    envInfoArtifact: ${{parameters.envInfoArtifact}}
+    envInfoFileBase: ${{parameters.envInfoFileBase}}
+
+- bash: |
+      source activate ${{parameters.condaEnv}}
+      python --version
+  displayName: 'Verify Python version'
+
+# Need to have alternatives to this install
+- template: package-installation-step-template.yml
+  parameters:
+    installationType: ${{parameters.installationType}}
+    pypiUrl: ${{parameters.pypiUrl}}
+    versionArtifactName: ${{parameters.versionArtifactName}}
+    versionArtifactFile: ${{parameters.versionArtifactFile}}
+    pipVersionVariable: variableForPipVersion
+    wheelArtifactName: ${{parameters.wheelArtifactName}}
+    condaEnv: ${{parameters.condaEnv}}
+
+- bash: |
+    source activate  ${{parameters.condaEnv}} 
+    pip install -r requirements-vis.txt
+  displayName: Install vis required pip packages
+
+- bash: |
+      source activate ${{parameters.condaEnv}}
+      flake8 --max-line-length=119 --exclude=.git/,__pycache__/,dist/ .
+  failOnStderr: true
+  displayName: 'Run flake8'
+
+- bash: |
+      source activate ${{parameters.condaEnv}}
+      isort . -c
+  failOnStderr: true
+  displayName: 'Make sure imports are sorted'
+
+- ${{ if eq(parameters.testRunType, 'Unit')}}:
+  - bash: |
+        source activate ${{parameters.condaEnv}}
+        python -m pytest tests/ -m "not notebooks" --junitxml=./TEST--TEST.xml -o junit_suite_name="$(Agent.JobName)-Unit"
+    displayName: Run Unit tests
+
+- ${{ if eq(parameters.testRunType, 'Notebooks')}}:
+  - bash: |
+        source activate ${{parameters.condaEnv}}
+        python -m pytest tests/ -m "notebooks" -s -v --junitxml=./TEST--TEST.xml -o junit_suite_name="$(Agent.JobName)-Notebooks"
+    displayName: Run Notebook tests
+
+- ${{ if eq(parameters.testRunType, 'CodeCoverage')}}:
+  - bash: |
+        source activate ${{parameters.condaEnv}}
+        python -m pytest tests/ -m "not notebooks" --junitxml=./TEST--TEST.xml -o junit_suite_name="$(Agent.JobName)-Coverage"  --cov=python --cov-report=xml --cov-report=html -o unit_suite_name="UnitCoverage"
+    displayName: Run Code Coverage tests
+
+  - task: PublishCodeCoverageResults@1
+    inputs:
+      codeCoverageTool: 'cobertura'
+      summaryFileLocation: $(System.DefaultWorkingDirectory)/coverage.xml
+      pathToSources: $(System.DefaultWorkingDirectory)
+      additionalCodeCoverageFiles: $(System.DefaultWorkingDirectory)/htmlcov/**
+      failIfCoverageEmpty: false
+      displayName: "Publish Code Coverage"
+
+- task: PublishTestResults@2
+  inputs:
+    testResultsFiles: '**/*.xml'
+    failTaskOnFailedTests: true
+  condition: succeededOrFailed()
+  displayName: 'Publish Test Results'
