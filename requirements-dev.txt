@@ -1,0 +1,9 @@
+xmlrunner
+mlflow
+tensorflow<=2.7.0
+hdbscan
+lightgbm
+xgboost
+sklearn_pandas
+# pinning here due to mlflow -> alembic -> SQLAlchemy -> greenlet==1.0.0
+greenlet==0.4.17
