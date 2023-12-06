@@ -1,0 +1,24 @@
+# ADO Pipeline for PRs
+
+variables:
+  EnvArtifactStem: 'environment'
+  EnvFileStem: 'environment'
+
+pr:
+- main
+
+trigger: none # No CI build
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+  
+jobs:
+- template: templates/all-tests-job-template.yml
+  parameters:
+    platforms:  { MacOS: macos-latest }
+    testRunTypes: ['Notebooks']
+    pyVersions: [3.7]
+    installationType: PipLocal
+    envArtifactStem: $(EnvArtifactStem)
+    envFileStem: $(EnvFileStem)

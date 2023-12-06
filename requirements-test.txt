@@ -1,0 +1,18 @@
+pytest
+pytest-cov
+nbformat
+papermill
+scrapbook
+flake8
+flake8-bugbear
+flake8-blind-except==0.1.1
+flake8-breakpoint
+flake8-logging-format
+flake8-pytest-style
+isort
+itsdangerous==2.0.1
+markupsafe<2.1.0
+# Jupyter dependency that fails with python 3.6
+pywinpty==2.0.2; python_version <= '3.6' and sys_platform == 'win32'
+jupyter
+jinja2==2.11.3
